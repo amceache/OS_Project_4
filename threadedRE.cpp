@@ -11,13 +11,25 @@
 #include <unistd.h>
 #include <string.h>
 #include <stdint.h>
+#include <iostream>
+#include <list>
 #include <string>
+#include <functional>
 
 #include "hashtable.h"
 
+using namespace std;
+
 /* GLOBALS ------------------------------------------------------------------ */
 
+#define HASH_SIZE 20000
+
 char * PROGRAM_NAME;
+hash<string> hash_fn; // Hash function called on strings
+list<string> hashtble[HASH_SIZE]; // Array to hold hash values
+int hits;
+int npackets;
+int ndata;
 
 /* PROTOTYPES --------------------------------------------------------------- */
 
@@ -29,6 +41,8 @@ void parse_packet (FILE * fp);
 
 int main (int argc, char * argv[])
 {
+    PROGRAM_NAME = argv[0];
+    
     printf("Welcome to Project 4 - ThreadedRE\n");
     if (argc < 4)
     {
@@ -42,6 +56,10 @@ int main (int argc, char * argv[])
     }
     int level = atoi(argv[2]);
     int thread_num, file_start, i;
+    hits = 0;
+    npackets = 0;
+    ndata = 0;
+
     if (strcmp(argv[3], "-thread") != 0)
     {
 	// Default thread_num
@@ -62,12 +80,23 @@ int main (int argc, char * argv[])
     // Init hashtable
     
     i = file_start;
+    printf("File to process: ");
     for (; i < argc; i++)
     {
 	// Get file names
-	printf("File to process: %s\n", argv[i]);
+	printf(" %s", argv[i]);
+	parse_data(argv[i]);
     }
-    
+
+    double redundancy = (double)hits / (double)npackets;
+    redundancy = redundancy * 100.00;
+    double mb = (double)ndata / 100000.00;
+
+    // Output data
+    printf("\n\nResults: \n");
+    printf("%f.2 MB processed\n", mb);
+    printf("%d hits\n", hits);
+    printf("%f.2%% redundancy detected\n\n", redundancy);
     return EXIT_SUCCESS;
 }
 
@@ -101,7 +130,7 @@ void parse_data(char * filename)
 
     fseek(file, 4, SEEK_CUR); // Increment to packet header
 
-    printf("magic number = %X\nsnaplen = %d\n", magic_number, snaplen);
+    // printf("magic number = %X\nsnaplen = %d\n", magic_number, snaplen);
     // Call to parse_packet
     // TODO: collect packet data in a data structure
     parse_packet(file);
@@ -127,17 +156,51 @@ void parse_packet(FILE * fp)
 	}
 	else if(packet_length < 2400)
 	{
+	    npackets++;
+	    
 	    // skip 52 bytes into packet payload (not hashed)
 	    fseek(fp, 52, SEEK_CUR);
 	    packet_length = packet_length - 52;
+	    ndata = ndata + packet_length;
 
 	    // read packet data
 	    fread(packet_data, 1, packet_length, fp);
-	    printf("Read packet of length %d\n", packet_length);
+	    // printf("Read packet of length %d\n", packet_length);
 	
 	    // convert to std::string
-	    std::string str;
+	    string str;
 	    str.assign(packet_data, packet_length);
+	
+	    // compute the hash value of the string
+	    size_t hash_val = hash_fn(str);
+
+	    // critical section for hashtbl - add new value to table
+	    if (hashtble[hash_val % HASH_SIZE].empty())
+	    {
+		// hash not been matched before
+		hashtble[hash_val % HASH_SIZE].push_back(str);
+	    }
+	    else
+	    {
+		// compare str to every element in list
+		bool match = false;
+		for (string s : hashtble[hash_val % HASH_SIZE])
+		{
+		    // compare s with str, if match, increment hits
+		    if (s == str)
+		    {
+			match = true;
+			hits++;
+			break;
+		    }
+		}
+		
+		// add element to list if there was not match
+		if (!match)
+		{
+		    hashtble[hash_val % HASH_SIZE].push_back(str);
+		}
+	    }
 	}
 	else
 	{
