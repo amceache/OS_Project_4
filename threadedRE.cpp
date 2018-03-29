@@ -94,9 +94,9 @@ int main (int argc, char * argv[])
 
     // Output data
     printf("\n\nResults: \n");
-    printf("%f.2 MB processed\n", mb);
+    printf("%4.2f MB processed\n", mb);
     printf("%d hits\n", hits);
-    printf("%f.2%% redundancy detected\n\n", redundancy);
+    printf("%4.2f%% redundancy detected\n\n", redundancy);
     return EXIT_SUCCESS;
 }
 
