@@ -32,6 +32,7 @@ hash<string> hash_fn; // Hash function called on strings
 list<string> hashtble[HASH_SIZE]; // Array to hold hash values
 int hits;
 int npackets;
+int nstored;
 int ndata;
 vector<FILE *> filevec;
 
@@ -68,6 +69,7 @@ int main (int argc, char * argv[])
     int thread_num, file_start, i;
     hits = 0;
     npackets = 0;
+    nstored = 0;
     ndata = 0;
 
     if (strcmp(argv[3], "-thread") != 0)
@@ -176,11 +178,13 @@ int main (int argc, char * argv[])
 
     double redundancy = (double)hits / (double)npackets;
     redundancy = redundancy * 100.00;
-    double mb = (double)ndata / 100000.00;
+    double mb = (double)ndata / 1000000.00;
+    // double storedmb = (double)nstored / 1000000.00;
 
     // Output data
     printf("\n\nResults: \n");
     printf("%4.2f MB processed\n", mb);
+    // printf("%4.2f MB stored in hash table\n", storedmb);
     printf("%d hits\n", hits);
     printf("%4.2f%% redundancy detected\n\n", redundancy);
     return EXIT_SUCCESS;
@@ -271,6 +275,21 @@ void parse_packet(FILE * fp)
 	    fseek(fp, 52, SEEK_CUR);
 	    packet_length = packet_length - 52;
 	    ndata = ndata + packet_length;
+	    nstored = nstored + packet_length;
+	    
+	    if (nstored > 64*1000000)
+	    {
+		// Stored data exceeds limit, eliminate data point
+		int r = rand() % HASH_SIZE;
+		while(hashtble[r].empty())
+		{   // continue looking for element to delete
+		    r = rand() % HASH_SIZE;
+		}
+		string s = hashtble[r].front();
+		nstored = nstored - s.size();
+		// printf("nstored: %d\n", nstored);
+		hashtble[r].pop_front();
+	    }
 
 	    // read packet data
 	    fread(packet_data, 1, packet_length, fp);
@@ -360,6 +379,21 @@ void * consumer( void * )
 	    fseek(fp, 52, SEEK_CUR);
 	    packet_length = packet_length - 52;
 	    ndata = ndata + packet_length;
+	    nstored = nstored + packet_length;
+	    
+	    if (nstored > 64*1000000)
+	    {
+		// Stored data exceeds limit, eliminate data point
+		int r = rand() % HASH_SIZE;
+		while(hashtble[r].empty())
+		{   // continue looking for element to delete
+		    r = rand() % HASH_SIZE;
+		}
+		string s = hashtble[r].front();
+		nstored = nstored - s.size();
+		// printf("nstored: %d\n", nstored);
+		hashtble[r].pop_front();
+	    }
 
 	    // read packet data
 	    fread(packet_data, 1, packet_length, fp);
