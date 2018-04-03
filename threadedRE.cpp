@@ -101,41 +101,55 @@ int main (int argc, char * argv[])
         }
     } else if (thread_num > 1) {
 
+	int running_threads=0;
+	int repeat=0;
+        i = file_start;
+        printf("Files to process: ");
 
-        /*
         //vectors of pthreads
-        int prod_num = (int) ceil(thread_num/2);
-        int cons_num = (int) floor(thread_num/2);
-        std::vector<pthread_t> producers(prod_num);
+        pthread_t thread_prod;
+        int cons_num = thread_num-1;
+	if (cons_num > argc - file_start) {
+	    cons_num = argc - file_start;
+	} else if (cons_num < argc - file_start) {
+	    // case if we have fewer threads than files to read??
+	    repeat = argc - file_start - cons_num;
+	}
         std::vector<pthread_t> consumers(cons_num);
 
-        for (vector<pthread_t>::iterator it = producers.begin(); it != producers.end(); it++) {
-            int rc = create(&*it, NULL, producer, NULL?);
-            assert(rc==0);
-        }
+	// producer thread
+        for (; i < argc; i++) {
+	    printf(" %s", argv[i]);
+	    char* arg = argv[i];
+            int rc = pthread_create(&thread_prod, NULL, producer, (void *) arg);
+	    running_threads++;
+	    assert(rc==0);
+	}
+
+	// consumer threads
         for (vector<pthread_t>::iterator jt = consumers.begin(); jt != consumers.end(); jt++) {
-            rc = create(&*jt, NULL, consumer, NULL);
+            int rc = pthread_create(&*jt, NULL, consumer, NULL);
+	    running_threads++;
             assert(rc==0);
         }
 
         // join
-        std::vector<pthread_t>::iterator pt = producers.begin();
-        while (pt != producers.end()) {
-            rc = pthread_join(*pt, NULL);
-            assert(rc==0);
-            pt++;
-        }
+        // producer
+	int rc = pthread_join(thread_prod, NULL);
+	assert(rc==0);
+	running_threads--;
+	// consumers
         std::vector<pthread_t>::iterator ct = consumers.begin();
         while (ct != consumers.end()) {
             rc = pthread_join(*ct, NULL);
             assert(rc==0);
             ct++;
+	    running_threads--;
         }
-*/
+/*
+
         pthread_t thread1;
         pthread_t thread2;
-        i = file_start;
-        printf("File to process: ");
 
         for (; i < argc; i++)
         {
@@ -154,6 +168,7 @@ int main (int argc, char * argv[])
             assert(rc==0);
             rc = pthread_join(thread2, NULL);
         }
+*/
     } else {
         usage(1);
     }
@@ -308,7 +323,7 @@ void parse_packet(FILE * fp)
 
 // Same as above - Parses all packets within a .pcap file
 // but with threading
-void * consumer( void * ) //void * fn) //FILE * fp)
+void * consumer( void * ) 
 {
     uint32_t packet_length;
     char packet_data[2400];
