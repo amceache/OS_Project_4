@@ -11,7 +11,7 @@ LDFLAGS +=			# Add any flags for compile
 all: threadedRE
 
 threadedRE: threadedRE.o
-	$(LD) $^ $(LDFLAGS) -o threadedRE
+	$(LD) $^ $(LDFLAGS) -lpthread -o threadedRE
 
 threadedRE.o: threadedRE.cpp
 	$(C) $(CFLAGS) -c threadedRE.cpp
