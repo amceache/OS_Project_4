@@ -31,10 +31,12 @@ using namespace std;
 char * PROGRAM_NAME;
 hash<string> hash_fn; // Hash function called on strings
 list<string> hashtble[HASH_SIZE]; // Array to hold hash values
+list<struct packet> hashtble2[HASH_SIZE];
 int hits;
 int npackets;
 int nstored;
 int ndata;
+int level;
 vector<FILE *> filevec;
 
 pthread_mutex_t q_mtx = PTHREAD_MUTEX_INITIALIZER;
@@ -66,7 +68,7 @@ int main (int argc, char * argv[])
 	printf("ERROR: Improper usage\n");
 	usage(1);
     }
-    int level = atoi(argv[2]);
+    level = atoi(argv[2]);
     int thread_num, file_start, i;
     hits = 0;
     npackets = 0;
@@ -280,60 +282,152 @@ void parse_packet(FILE * fp)
 	    // skip 52 bytes into packet payload (not hashed)
 	    fseek(fp, 52, SEEK_CUR);
 	    packet_length = packet_length - 52;
-	    ndata = ndata + packet_length;
-	    nstored = nstored + packet_length;
 	    
-	    if (nstored > 64*1000000)
+	    if (level == 1)
 	    {
-		// Stored data exceeds limit, eliminate data point
-		int r = rand() % HASH_SIZE;
-		while(hashtble[r].empty())
-		{   // continue looking for element to delete
-		    r = rand() % HASH_SIZE;
-		}
-		string s = hashtble[r].front();
-		nstored = nstored - s.size();
-		// printf("nstored: %d\n", nstored);
-		hashtble[r].pop_front();
-	    }
-
-	    // read packet data
-	    fread(packet_data, 1, packet_length, fp);
-	    // printf("Read packet of length %d\n", packet_length);
-	
-	    // convert to std::string
-	    string str;
-	    str.assign(packet_data, packet_length);
-	
-	    // compute the hash value of the string
-	    size_t hash_val = hash_fn(str);
-
-	    // critical section for hashtbl - add new value to table
-	    if (hashtble[hash_val % HASH_SIZE].empty())
-	    {
-		// hash not been matched before
-		hashtble[hash_val % HASH_SIZE].push_back(str);
-	    }
-	    else
-	    {
-		// compare str to every element in list
-		bool match = false;
-		for (string s : hashtble[hash_val % HASH_SIZE])
+		ndata = ndata + packet_length;
+		nstored = nstored + packet_length;
+	    
+		if (nstored > 64*1000000)
 		{
-		    // compare s with str, if match, increment hits
-		    if (s == str)
-		    {
-			match = true;
-			hits++;
-			break;
+		    // Stored data exceeds limit, eliminate data point
+		    int r = rand() % HASH_SIZE;
+		    while(hashtble[r].empty())
+		    {   // continue looking for element to delete
+			r = rand() % HASH_SIZE;
 		    }
+		    string s = hashtble[r].front();
+		    nstored = nstored - s.size();
+		    // printf("nstored: %d\n", nstored);
+		    hashtble[r].pop_front();
 		}
-		
-		// add element to list if there was not match
-		if (!match)
+
+		// read packet data
+		fread(packet_data, 1, packet_length, fp);
+		// printf("Read packet of length %d\n", packet_length);
+	
+		// convert to std::string
+		string str;
+		str.assign(packet_data, packet_length);
+	
+		// compute the hash value of the string
+		size_t hash_val = hash_fn(str);
+
+		// critical section for hashtbl - add new value to table
+		if (hashtble[hash_val % HASH_SIZE].empty())
 		{
+		    // hash not been matched before
 		    hashtble[hash_val % HASH_SIZE].push_back(str);
 		}
+		else
+		{
+		    // compare str to every element in list
+		    bool match = false;
+		    for (string s : hashtble[hash_val % HASH_SIZE])
+		    {
+			// compare s with str, if match, increment hits
+			if (s == str)
+			{
+			    match = true;
+			    hits++;
+			    break;
+			}
+		    }
+		
+		    // add element to list if there was not match
+		    if (!match)
+		    {
+			hashtble[hash_val % HASH_SIZE].push_back(str);
+		    }
+		}
+	    }
+	    else // Level 2
+	    {
+		ndata = ndata + packet_length;
+		nstored = nstored + packet_length;
+	    
+		if (nstored > 64*1000000)
+		{
+		    // Stored data exceeds limit, eliminate data point
+		    int r = rand() % HASH_SIZE;
+		    while(hashtble[r].empty())
+		    {   // continue looking for element to delete
+			r = rand() % HASH_SIZE;
+		    }
+		    string s = hashtble[r].front();
+		    nstored = nstored - s.size();
+		    // printf("nstored: %d\n", nstored);
+		    hashtble[r].pop_front();
+		}
+
+		// read packet data
+		fread(packet_data, 1, packet_length, fp);
+		// printf("Read packet of length %d\n", packet_length);
+		int nwindows = packet_length - 64 + 1;
+
+		string str;
+		str.assign(packet_data, packet_length);
+		// printf("packet_length = %d\n", packet_length);
+		for (int w = 0; w < nwindows; w++)
+		{
+		    string hash_str;
+		    //cout << "string size = " << str.size() << endl;
+		    hash_str.assign(str, w, packet_length);
+		    
+		    size_t hash_val = hash_fn(hash_str);
+		    int hash_comp = hash_val % HASH_SIZE;
+		    int nchar = 0; // number of matching chars found
+
+		    if (hashtble2[hash_comp].empty())
+		    {
+			// hash not been matched
+			struct packet p;
+			p.start = w;
+			p.s = str;
+			hashtble2[hash_comp].push_back(p);
+		    }
+		    else
+		    {
+			bool match = false;
+			for (struct packet p : hashtble2[hash_comp])
+			{
+			    nchar = 0;
+			    for (string::size_type j = 0; (j+p.start) < p.s.size() && (j+w) < str.size(); j++)
+			    {
+				if (p.s[p.start+j] == str[w+j])
+				{
+				    nchar++;
+				}
+				else 
+				{
+				    break;
+				}
+			    }
+			    if (nchar >= 64)
+			    {
+				match = true;
+				hits++;
+				break;
+			    }   
+			}
+
+			if (!match)
+			{
+			    // add element if not match
+			    struct packet p;
+			    p.start = w;
+			    p.s = str;
+			    hashtble2[hash_comp].push_back(p);
+			}
+		    }
+
+		    if (nchar >= 64)
+		    {
+			w = w + nchar;
+		    }
+
+		}
+
 	    }
 	}
 	else
