@@ -66,7 +66,14 @@ int main (int argc, char * argv[])
 	printf("ERROR: Improper usage\n");
 	usage(1);
     }
-    int level = atoi(argv[2]);
+    // check level validity
+    int level;
+    if (strcmp(argv[2],"1") == 0 || strcmp(argv[2],"2") == 0) {
+        level = stoi(argv[2]);
+    } else {
+	printf("ERROR: Improper usage\n");
+	usage(1);
+    } 
     int thread_num, file_start, i;
     hits = 0;
     npackets = 0;
@@ -80,8 +87,13 @@ int main (int argc, char * argv[])
 	file_start = 3;
     }
     else
-    {
-	thread_num = atoi(argv[4]);
+    { // make sure thread_num is an int
+	try {
+	thread_num = stoi(argv[4]);
+	} catch (...) {
+	    printf("ERROR: Improper usage\n");
+	    usage(1);
+	}
 	file_start = 5;
     }
 
@@ -197,6 +209,12 @@ void usage(int status)
 // Parses global header of .pcap and calls parse_packet
 void parse_data(char * filename)
 {
+    // check file type
+    if (strstr(filename, ".pcap")) {
+	fprintf(stderr, "ERROR: %s - Invalid File\n", filename);
+        return;
+    }
+
     FILE * file = fopen(filename, "rb"); // open .pcap file
     if (file == NULL)
     {
@@ -224,11 +242,17 @@ void parse_data(char * filename)
     parse_packet(file);
 }
 
+// copy of parse_data(), for use by threads
 void * producer(void * fn) {
     char *filename;
     filename = (char *) fn;
 
-    // copy of parse_data(), for use by threads
+    // check file type
+    if (strstr(filename, ".pcap")) {
+	fprintf(stderr, "ERROR: %s - Invalid File\n", filename);
+	exit(1);
+    }
+
     FILE * file = fopen(filename, "rb");
     if (file == NULL)
     {
