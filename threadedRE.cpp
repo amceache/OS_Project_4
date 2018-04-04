@@ -388,8 +388,6 @@ void * consumer( void * )
     filevec.erase(filevec.begin());
     pthread_mutex_unlock( &q_mtx );
    
-    // lock for hash
-    pthread_mutex_lock( &hash_mtx );
     while(fread(&rand_char, 8, 1, fp) != 0)
     {
 	// fseek(fp, 8, SEEK_CUR); // Increment past timestamps
@@ -437,6 +435,8 @@ void * consumer( void * )
 	    // compute the hash value of the string
 	    size_t hash_val = hash_fn(str);
 
+    	    // lock for hash
+    	    pthread_mutex_lock( &hash_mtx );
 	    // critical section for hashtbl - add new value to table
 	    if (hashtble[hash_val % HASH_SIZE].empty())
 	    {
@@ -464,6 +464,7 @@ void * consumer( void * )
 		    hashtble[hash_val % HASH_SIZE].push_back(str);
 		}
 	    }
+            pthread_mutex_unlock( &hash_mtx );
 	}
 	else
 	{
@@ -472,7 +473,6 @@ void * consumer( void * )
 	}
 	// Read packet and moved to next one at this point
     }
-    pthread_mutex_unlock( &hash_mtx );
 
     return NULL;
 }
