@@ -234,7 +234,7 @@ void * producer(void * fn) {
     {
 	// fopen failed
 	fprintf(stderr, "ERROR: %s - Invalid File\n", filename);
-	return NULL;
+	exit(1);
     }
     void* magic_number = malloc(4);
     void* snaplen = malloc(4);
