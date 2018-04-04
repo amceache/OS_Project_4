@@ -210,7 +210,7 @@ void usage(int status)
 void parse_data(char * filename)
 {
     // check file type
-    if (strstr(filename, ".pcap")) {
+    if (strstr(filename, ".pcap") == NULL) {
 	fprintf(stderr, "ERROR: %s - Invalid File\n", filename);
         return;
     }
@@ -248,7 +248,7 @@ void * producer(void * fn) {
     filename = (char *) fn;
 
     // check file type
-    if (strstr(filename, ".pcap")) {
+    if (strstr(filename, ".pcap") == NULL) {
 	fprintf(stderr, "ERROR: %s - Invalid File\n", filename);
 	exit(1);
     }
