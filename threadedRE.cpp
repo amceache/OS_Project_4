@@ -106,11 +106,13 @@ int main (int argc, char * argv[])
 
 	int running_threads=0;
 	int repeat=0;
-        printf("Files to process: ");
-	
 	// producer thread
 	 pthread_t thread_prod;
         int cons_num = thread_num - 1;
+
+	printf("Allocating 1 thread to file I/O, %d threads to processing\n", cons_num);
+        printf("Files to process: ");
+	
         if (cons_num > argc - file_start) {
             cons_num = argc - file_start;
         } else if (cons_num < argc - file_start) {
