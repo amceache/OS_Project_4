@@ -37,6 +37,7 @@ int npackets;
 int nstored;
 int ndata;
 int level;
+int matchchar;
 vector<FILE *> filevec;
 
 pthread_mutex_t q_mtx = PTHREAD_MUTEX_INITIALIZER;
@@ -183,7 +184,15 @@ int main (int argc, char * argv[])
 	return EXIT_FAILURE;
     }
 
-    double redundancy = (double)hits / (double)npackets;
+    double redundancy;
+    if (level == 1)
+    {
+	redundancy = (double)hits / (double)npackets;
+    }
+    else
+    {
+	redundancy = (double)matchchar / (double)ndata;
+    }
     redundancy = redundancy * 100.00;
     double mb = (double)ndata / 1000000.00;
     // double storedmb = (double)nstored / 1000000.00;
@@ -448,6 +457,7 @@ void parse_packet(FILE * fp)
 		    if (nchar >= 64)
 		    {
 			w = w + nchar;
+			matchchar = matchchar + nchar;
 		    }
 
 		}
