@@ -377,22 +377,7 @@ void parse_packet(FILE * fp)
 	    else // Level 2
 	    {
 		ndata = ndata + packet_length;
-		nstored = nstored + packet_length;
 	    
-		if (nstored > 64*1000000)
-		{
-		    // Stored data exceeds limit, eliminate data point
-		    int r = rand() % HASH_SIZE;
-		    while(hashtble[r].empty())
-		    {   // continue looking for element to delete
-			r = rand() % HASH_SIZE;
-		    }
-		    string s = hashtble[r].front();
-		    nstored = nstored - s.size();
-		    // printf("nstored: %d\n", nstored);
-		    hashtble[r].pop_front();
-		}
-
 		// read packet data
 		fread(packet_data, 1, packet_length, fp);
 		// printf("Read packet of length %d\n", packet_length);
@@ -403,6 +388,22 @@ void parse_packet(FILE * fp)
 		// printf("packet_length = %d\n", packet_length);
 		for (int w = 0; w < nwindows; w++)
 		{
+		    nstored = 4 + packet_length + nstored;
+
+		    if (nstored > 64*1000000)
+		    {
+			// Stored data exceeds limit, eliminate data point
+			int r = rand() % HASH_SIZE;
+			while(hashtble2[r].empty())
+			{   // continue looking for element to delete
+			    r = rand() % HASH_SIZE;
+			}
+			struct packet p = hashtble2[r].front();
+			nstored = nstored - p.s.size();
+			// printf("nstored: %d\n", nstored);
+			hashtble2[r].pop_front();
+		    }
+		    
 		    string hash_str;
 		    //cout << "string size = " << str.size() << endl;
 		    hash_str.assign(str, w, packet_length);
@@ -411,6 +412,7 @@ void parse_packet(FILE * fp)
 		    int hash_comp = hash_val % HASH_SIZE;
 		    int nchar = 0; // number of matching chars found
 
+		    // critical section of hashtble2
 		    if (hashtble2[hash_comp].empty())
 		    {
 			// hash not been matched
