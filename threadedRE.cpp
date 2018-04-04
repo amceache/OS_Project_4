@@ -513,65 +513,159 @@ void * consumer( void * )
 	    // skip 52 bytes into packet payload (not hashed)
 	    fseek(fp, 52, SEEK_CUR);
 	    packet_length = packet_length - 52;
-	    ndata = ndata + packet_length;
-	    nstored = nstored + packet_length;
+
+	    if (level == 1) {
+	        ndata = ndata + packet_length;
+  	        nstored = nstored + packet_length;
 	    
-	    if (nstored > 64*1000000)
-	    {
-		// Stored data exceeds limit, eliminate data point
-		int r = rand() % HASH_SIZE;
-		while(hashtble[r].empty())
-		{   // continue looking for element to delete
-		    r = rand() % HASH_SIZE;
-		}
-		string s = hashtble[r].front();
-		nstored = nstored - s.size();
-		// printf("nstored: %d\n", nstored);
-		hashtble[r].pop_front();
-	    }
-
-	    // read packet data
-	    fread(packet_data, 1, packet_length, fp);
-	    // printf("Read packet of length %d\n", packet_length);
-	
-	    // convert to std::string
-	    string str;
-	    str.assign(packet_data, packet_length);
-	
-	    // compute the hash value of the string
-	    size_t hash_val = hash_fn(str);
-
-    	    // lock for hash
-    	    pthread_mutex_lock( &hash_mtx );
-	    // critical section for hashtbl - add new value to table
-	    if (hashtble[hash_val % HASH_SIZE].empty())
-	    {
-		// hash not been matched before
-		hashtble[hash_val % HASH_SIZE].push_back(str);
-	    }
-	    else
-	    {
-		// compare str to every element in list
-		bool match = false;
-		for (string s : hashtble[hash_val % HASH_SIZE])
-		{
-		    // compare s with str, if match, increment hits
-		    if (s == str)
-		    {
-			match = true;
-			hits++;
-			break;
+	        if (nstored > 64*1000000)
+	        {
+    	            // lock for hash
+    	            pthread_mutex_lock( &hash_mtx );
+		    // Stored data exceeds limit, eliminate data point
+		    int r = rand() % HASH_SIZE;
+		    while(hashtble[r].empty())
+		    {   // continue looking for element to delete
+		        r = rand() % HASH_SIZE;
 		    }
-		}
-		
-		// add element to list if there was not match
-		if (!match)
-		{
+		    string s = hashtble[r].front();
+		    nstored = nstored - s.size();
+		    // printf("nstored: %d\n", nstored);
+		    hashtble[r].pop_front();
+                    pthread_mutex_unlock( &hash_mtx );
+	        }
+
+	        // read packet data
+	        fread(packet_data, 1, packet_length, fp);
+	        // printf("Read packet of length %d\n", packet_length);
+	
+	        // convert to std::string
+	        string str;
+	        str.assign(packet_data, packet_length);
+	
+  	        // compute the hash value of the string
+	        size_t hash_val = hash_fn(str);
+
+    	        // lock for hash
+    	        pthread_mutex_lock( &hash_mtx );
+	        // critical section for hashtbl - add new value to table
+	        if (hashtble[hash_val % HASH_SIZE].empty())
+	        {
+		    // hash not been matched before
 		    hashtble[hash_val % HASH_SIZE].push_back(str);
+	        }
+	        else
+	        {
+		    // compare str to every element in list
+		    bool match = false;
+		    for (string s : hashtble[hash_val % HASH_SIZE])
+		    {
+		        // compare s with str, if match, increment hits
+		        if (s == str)
+		        {
+			    match = true;
+			    hits++;
+			    break;
+		        }
+		    }
+		
+		    // add element to list if there was not match
+		    if (!match)
+		    {
+		        hashtble[hash_val % HASH_SIZE].push_back(str);
+		    }
+	        }
+                pthread_mutex_unlock( &hash_mtx );
+	    } else { // level 2
+		ndata = ndata + packet_length;
+
+		// read packet data
+	 	fread(packet_data, 1, packet_length, fp);
+		int nwindows = packet_length - 64 + 1;
+
+		string str;
+                str.assign(packet_data, packet_length);
+		for (int w = 0; w < nwindows; w++)
+                {
+                    nstored = 4 + packet_length + nstored;
+
+                    if (nstored > 64*1000000)
+                    {
+    	                // lock for hash
+    	                pthread_mutex_lock( &hash_mtx );
+                        // Stored data exceeds limit, eliminate data point
+                        int r = rand() % HASH_SIZE;
+                        while(hashtble2[r].empty())
+                        {   // continue looking for element to delete
+			     r = rand() % HASH_SIZE;
+                        }
+                        struct packet p = hashtble2[r].front();
+                        nstored = nstored - p.s.size();
+                        // printf("nstored: %d\n", nstored);
+                        hashtble2[r].pop_front();
+			pthread_mutex_unlock( &hash_mtx );
+                    }
+
+                    string hash_str;
+		    hash_str.assign(str, w, packet_length);
+
+                    size_t hash_val = hash_fn(hash_str);
+		    int hash_comp = hash_val % HASH_SIZE;
+                    int nchar = 0; // number of matching chars found
+
+		    pthread_mutex_lock( &hash_mtx );
+		    // critical section of hashtble2
+		    if (hashtble2[hash_comp].empty())
+                    {
+                        // hash not been matched
+                        struct packet p;
+                        p.start = w;
+                        p.s = str;
+                        hashtble2[hash_comp].push_back(p);
+                    }
+                    else
+                    {
+                        bool match = false;
+                        for (struct packet p : hashtble2[hash_comp])
+                        {
+                            nchar = 0;
+                            for (string::size_type j = 0; (j+p.start) < p.s.size() && (j+w) < str.size(); j++)
+                            {
+			        if (p.s[p.start+j] == str[w+j])
+                                {
+                                    nchar++;
+                                }
+                                else
+                                {
+                                    break;
+                                }
+                            }
+                            if (nchar >= 64)
+                            {
+                                match = true;
+                                hits++;
+                                break;
+                            }
+                        }
+
+                        if (!match)
+                        { // add element if not match
+			     struct packet p;
+                            p.start = w;
+                            p.s = str;
+                            hashtble2[hash_comp].push_back(p);
+                        }
+                    }
+		    pthread_mutex_unlock( &hash_mtx );
+
+                    if (nchar >= 64)
+                    {
+                        w = w + nchar;
+                        matchchar = matchchar + nchar;
+                    }
 		}
 	    }
-            pthread_mutex_unlock( &hash_mtx );
-	}
+ 	}
 	else
 	{
 	    // Packet is too long
