@@ -254,10 +254,11 @@ void parse_packet(FILE * fp)
 {
     uint32_t packet_length;
     char packet_data[2400];
-    
-    while(!feof(fp))
+    char rand_char[10];
+
+    while(fread(&rand_char, 8, 1, fp) != 0)
     {
-	fseek(fp, 8, SEEK_CUR); // Increment past timestamps
+	//fseek(fp, 8, SEEK_CUR); // Increment past timestamps
 	fread(&packet_length, 4, 1, fp);
 	fseek(fp, 4, SEEK_CUR); // Increment to packet data
 
@@ -346,6 +347,7 @@ void * consumer( void * )
 {
     uint32_t packet_length;
     char packet_data[2400];
+    char rand_char[10];
     FILE * fp;
     //fp = (FILE *) fn;
 
@@ -359,9 +361,9 @@ void * consumer( void * )
    
     // lock for hash
     pthread_mutex_lock( &hash_mtx );
-    while(!feof(fp))
+    while(fread(&rand_char, 8, 1, fp) != 0)
     {
-	fseek(fp, 8, SEEK_CUR); // Increment past timestamps
+	// fseek(fp, 8, SEEK_CUR); // Increment past timestamps
 	fread(&packet_length, 4, 1, fp);
 	fseek(fp, 4, SEEK_CUR); // Increment to packet data
 
