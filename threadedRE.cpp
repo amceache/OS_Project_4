@@ -18,6 +18,7 @@
 #include <vector>
 #include <pthread.h>
 #include <assert.h>
+#include <math.h>
 
 #include "hashtable.h"
 
@@ -105,74 +106,59 @@ int main (int argc, char * argv[])
 
 	int running_threads=0;
 	int repeat=0;
-        i = file_start;
         printf("Files to process: ");
-
-        //vectors of pthreads
-        pthread_t thread_prod;
-        int cons_num = thread_num-1;
-	if (cons_num > argc - file_start) {
-	    cons_num = argc - file_start;
-	} else if (cons_num < argc - file_start) {
-	    // case if we have fewer threads than files to read??
-	    repeat = argc - file_start - cons_num;
-	}
-        std::vector<pthread_t> consumers(cons_num);
-
+	
 	// producer thread
-        for (; i < argc; i++) {
-	    printf(" %s", argv[i]);
-	    char* arg = argv[i];
-            int rc = pthread_create(&thread_prod, NULL, producer, (void *) arg);
-	    running_threads++;
-	    assert(rc==0);
-	}
-
-	// consumer threads
-        for (vector<pthread_t>::iterator jt = consumers.begin(); jt != consumers.end(); jt++) {
-            int rc = pthread_create(&*jt, NULL, consumer, NULL);
-	    running_threads++;
-            assert(rc==0);
+	 pthread_t thread_prod;
+        int cons_num = thread_num - 1;
+        if (cons_num > argc - file_start) {
+            cons_num = argc - file_start;
+        } else if (cons_num < argc - file_start) {
+            repeat = (int) ceil((argc-file_start)/cons_num);
         }
 
-        // join
+        while (repeat >= 0) {
+            if (repeat == 0) {
+                cons_num = argc - file_start;
+            }
+            // consumer vector
+            std::vector<pthread_t> consumers(cons_num);
+            // producer thread
+            i=0;
+            while (i<cons_num && i+file_start < argc) {
+                printf(" %s", argv[i+file_start]);
+                char* arg = argv[i+file_start];
+                int rc = pthread_create(&thread_prod, NULL, producer, (void *) arg);
+                assert(rc==0);
+                i++;
+            }
+            file_start += i;
+
+            // consumer threads
+            for (vector<pthread_t>::iterator jt = consumers.begin(); jt != consumers.end(); jt++) {
+                int rc = pthread_create(&*jt, NULL, consumer, NULL);
+                running_threads++;
+                assert(rc==0);
+            }
+
+            // join consumers
+            std::vector<pthread_t>::iterator ct = consumers.begin();
+
+            while (ct != consumers.end()) {
+                int rc = pthread_join(*ct, NULL);
+                assert(rc==0);
+                ct++;
+                running_threads--;
+            }
+            repeat--;
+        }
         // producer
-	int rc = pthread_join(thread_prod, NULL);
-	assert(rc==0);
-	running_threads--;
-	// consumers
-        std::vector<pthread_t>::iterator ct = consumers.begin();
-        while (ct != consumers.end()) {
-            rc = pthread_join(*ct, NULL);
-            assert(rc==0);
-            ct++;
-	    running_threads--;
-        }
-/*
+        int rc = pthread_join(thread_prod, NULL);
+        assert(rc==0);
+        running_threads--;
 
-        pthread_t thread1;
-        pthread_t thread2;
-
-        for (; i < argc; i++)
-        {
-	    // Get file names
-	    printf(" %s", argv[i]);
-	    char* arg = argv[i];
-            
-            // create
-            int rc = pthread_create(&thread1, NULL, producer, (void *) arg);
-            assert(rc==0);
-            rc = pthread_create(&thread2, NULL, consumer, NULL);
-            assert(rc==0);
-
-            // join
-            rc = pthread_join(thread1, NULL);
-            assert(rc==0);
-            rc = pthread_join(thread2, NULL);
-        }
-*/
     } else {
-        usage(1);
+	usage(1);
     }
 
 
