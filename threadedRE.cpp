@@ -191,6 +191,11 @@ void usage(int status)
 void parse_data(char * filename)
 {
     FILE * file = fopen(filename, "rb"); // open .pcap file
+    if (file == NULL)
+    {
+	// fopen failed
+	return;
+    }
     uint32_t magic_number;
     uint32_t snaplen;
     if(fread(&magic_number, 4, 1, file) < 4)
