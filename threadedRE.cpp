@@ -163,6 +163,11 @@ int main (int argc, char * argv[])
 	usage(1);
     }
 
+    if (ndata == 0)
+    {
+	printf("\n\nNo valid files to read.\n");
+	return EXIT_FAILURE;
+    }
 
     double redundancy = (double)hits / (double)npackets;
     redundancy = redundancy * 100.00;
@@ -196,6 +201,7 @@ void parse_data(char * filename)
     if (file == NULL)
     {
 	// fopen failed
+	fprintf(stderr, "ERROR: %s - Invalid File\n", filename);
 	return;
     }
     uint32_t magic_number;
@@ -224,6 +230,12 @@ void * producer(void * fn) {
 
     // copy of parse_data(), for use by threads
     FILE * file = fopen(filename, "rb");
+    if (file == NULL)
+    {
+	// fopen failed
+	fprintf(stderr, "ERROR: %s - Invalid File\n", filename);
+	return NULL;
+    }
     void* magic_number = malloc(4);
     void* snaplen = malloc(4);
     if(fread(&magic_number, 4, 1, file) < 4) { }
